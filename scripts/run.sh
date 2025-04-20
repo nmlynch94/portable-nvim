@@ -20,6 +20,5 @@ stop_xrdp_services() {
 echo -e "starting xrdp services...\n"
 
 trap "stop_xrdp_services" SIGKILL SIGTERM SIGHUP SIGINT EXIT
-echo nlynch:password | chpasswd
 wait
 start_xrdp_services

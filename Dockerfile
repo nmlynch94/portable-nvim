@@ -59,7 +59,9 @@ RUN git clone https://github.com/neovim/neovim.git \
 	&& rm -r neovim
 
 RUN adduser --shell /bin/zsh ${USERNAME} \
-	&& adduser ${USERNAME} sudo
+	&& adduser ${USERNAME} sudo \
+	&& echo ${USERNAME}:password | chpasswd
+
 
 USER ${USERNAME}
 

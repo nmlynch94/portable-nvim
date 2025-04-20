@@ -2,7 +2,7 @@ FROM --platform=linux/amd64 ubuntu:latest
 
 # Config
 ARG BUILD_DEPS="ninja-build gettext cmake curl build-essential"
-ARG RUN_DEPS="gcc g++ git fzf markdownlint python3-pip python3-venv shellcheck tmux sudo unzip curl wget zsh golang terraform"
+ARG RUN_DEPS="xclip xsel kitty jq yq gcc g++ git fzf markdownlint python3-pip python3-venv shellcheck tmux sudo unzip curl wget zsh golang terraform"
 ARG NVIM_COMMIT_SHA="a99c469e547fc59472d6d105c0fae323958297a1"
 ARG ZSH_PLUGINS="git aws zsh-vi-mode zsh-autosuggestions"
 ARG USERNAME="nlynch"
@@ -13,7 +13,9 @@ ARG HASHICORP_FINGERPRINT="798A EC65 4E5C 1542 8C8E 42EE AA16 FCBC A621 E701"
 
 ENV XDG_CONFIG_HOME="${XDG_CONFIG_HOME}"
 ENV TMUX_PLUGIN_MANAGER_PATH="${XDG_CONFIG_HOME}/tmux/plugins/tpm"
+ENV DEBIAN_FRONTEND=noninteractive
 
+# nvim build and runtime deps
 RUN set -x && apt-get update -y \
 	&& apt-get install -y gnupg software-properties-common wget \
 	&& wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null \
@@ -21,7 +23,32 @@ RUN set -x && apt-get update -y \
 	&& apt-get update -y && apt-get install -y ${BUILD_DEPS} ${RUN_DEPS} \
 	&& curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
 	&& unzip awscliv2.zip \
-	&& ./aws/install
+	&& ./aws/install \
+	&& curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb" \
+	&& dpkg -i session-manager-plugin.deb
+
+#XFCE deps
+RUN apt-get install -y \
+	xfce4 \
+	xfce4-clipman-plugin \
+	xfce4-cpugraph-plugin \
+	xfce4-netload-plugin \
+	xfce4-screenshooter \
+	xfce4-taskmanager \
+	xfce4-terminal \
+	xfce4-xkb-plugin 
+
+RUN apt-get install -y \
+	dbus-x11 
+
+RUN apt-get install -y \
+	sudo \
+	wget \
+	xorgxrdp \
+	xrdp && \
+	apt remove -y light-locker xscreensaver && \
+	apt autoremove -y && \
+	rm -rf /var/cache/apt /var/lib/apt/lists
 
 RUN git clone https://github.com/neovim/neovim.git \
 	&& cd neovim \
@@ -33,7 +60,6 @@ RUN git clone https://github.com/neovim/neovim.git \
 
 RUN adduser --shell /bin/zsh ${USERNAME} \
 	&& adduser ${USERNAME} sudo
-
 
 USER ${USERNAME}
 
@@ -57,13 +83,13 @@ RUN git clone --recurse-submodules "${DOTFILES_REPO}" "${HOME_DIR}/dotfiles" \
 
 USER root
 
-# Cleanup packages
-RUN apt-get remove "${BUILD_DEPS}" -y \
-	&& apt-get autoremove -y \
-	&& rm -rf "${HOME_DIR}/dotfiles"
-
-USER ${USERNAME}
+COPY scripts/run.sh /usr/bin/run.sh
+COPY scripts/session_forward.sh /usr/bin/session_forward.sh
+RUN chmod +x /usr/bin/run.sh
+RUN chmod +x /usr/bin/session_forward.sh
 
 VOLUME ["${HOME_DIR}"]
 
-CMD ["/bin/zsh"]
+EXPOSE 3389
+
+ENTRYPOINT [ "/usr/bin/run.sh" ]

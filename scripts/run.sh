@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo su "${USERNAME}" nvm install 20
 
 start_xrdp_services() {
   # Preventing xrdp startup failure
@@ -19,6 +20,6 @@ stop_xrdp_services() {
 
 echo -e "starting xrdp services...\n"
 
-trap "stop_xrdp_services" SIGKILL SIGTERM SIGHUP SIGINT EXIT
+trap "stop_xrdp_services" SIGTERM SIGHUP SIGINT EXIT
 wait
 start_xrdp_services

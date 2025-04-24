@@ -2,7 +2,7 @@ FROM --platform=linux/amd64 ubuntu:latest
 
 # Config
 ARG BUILD_DEPS="ninja-build gettext cmake curl build-essential"
-ARG RUN_DEPS="xclip xsel kitty jq yq gcc g++ git fzf markdownlint python3-pip python3-venv shellcheck tmux sudo unzip curl wget zsh golang terraform"
+ARG RUN_DEPS="xclip xsel kitty jq yq gcc g++ git fzf markdownlint python3-pip python3-venv shellcheck tmux sudo unzip curl wget zsh golang terraform openssh-server"
 ARG NVIM_COMMIT_SHA="a99c469e547fc59472d6d105c0fae323958297a1"
 ARG ZSH_PLUGINS="git aws zsh-vi-mode zsh-autosuggestions"
 ARG USERNAME="nlynch"
@@ -10,10 +10,12 @@ ARG HOME_DIR="/home/${USERNAME}"
 ARG DOTFILES_REPO="https://github.com/nmlynch94/dotfiles.git"
 ARG XDG_CONFIG_HOME="${HOME_DIR}/.config"
 ARG HASHICORP_FINGERPRINT="798A EC65 4E5C 1542 8C8E 42EE AA16 FCBC A621 E701"
+ARG NODE_VERSION=20
 
 ENV XDG_CONFIG_HOME="${XDG_CONFIG_HOME}"
 ENV TMUX_PLUGIN_MANAGER_PATH="${XDG_CONFIG_HOME}/tmux/plugins/tpm"
 ENV DEBIAN_FRONTEND=noninteractive
+ENV USERNAME="${USERNAME}"
 
 # nvim build and runtime deps
 RUN set -x && apt-get update -y \
@@ -25,7 +27,9 @@ RUN set -x && apt-get update -y \
 	&& unzip awscliv2.zip \
 	&& ./aws/install \
 	&& curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb" \
-	&& dpkg -i session-manager-plugin.deb
+	&& dpkg -i session-manager-plugin.deb \
+	&& mkdir /var/run/sshd \
+	&& chmod 0755 var/run/sshd
 
 #XFCE deps
 RUN apt-get install -y \
@@ -62,7 +66,6 @@ RUN adduser --shell /bin/zsh ${USERNAME} \
 	&& adduser ${USERNAME} sudo \
 	&& echo ${USERNAME}:password | chpasswd
 
-
 USER ${USERNAME}
 
 WORKDIR ${HOME_DIR}
@@ -83,15 +86,20 @@ RUN git clone --recurse-submodules "${DOTFILES_REPO}" "${HOME_DIR}/dotfiles" \
 	# Install nvim plugins from dotfiles
 	&& nvim --headless "+Lazy! sync" +qa
 
+# Install nvm
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+
 USER root
 
-COPY scripts/run.sh /usr/bin/run.sh
+COPY scripts/run.sh /usr/bin/run_xrdp.sh
 COPY scripts/session_forward.sh /usr/bin/session_forward.sh
-RUN chmod +x /usr/bin/run.sh
+COPY scripts/run_ssh.sh /usr/bin/run_ssh.sh
+RUN chmod +x /usr/bin/run_xrdp.sh
 RUN chmod +x /usr/bin/session_forward.sh
+RUN chmod +x /usr/bin/run_ssh.sh
 
 VOLUME ["${HOME_DIR}"]
 
 EXPOSE 3389
 
-ENTRYPOINT [ "/usr/bin/run.sh" ]
+ENTRYPOINT [ "/usr/bin/run_ssh.sh" ]
